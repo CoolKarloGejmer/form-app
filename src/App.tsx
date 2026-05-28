@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useForm, FormProvider, useWatch } from 'react-hook-form';
 import type { SubmitHandler } from 'react-hook-form';
 import { FormSections } from './FormSections';
@@ -114,14 +114,14 @@ const sectionFields: Record<SectionId, SectionFieldsType> = {
 
 const sectionTitles: Record<SectionId, string> = {
   1: 'Upitnik za nove klijente',
-  2: 'Osnovne informacije 📝',
+  2: 'Osnovne informacije',
   3: 'Odaberite pogon Virtualne Tvornice',
   4: 'Marketinške usluge',
   5: 'Web + Marketing',
   6: 'Informacije o web projektu',
-  7: 'Informacije o web shopu 🛍️',
+  7: 'Informacije o web shopu',
   8: 'ERP integracija',
-  9: 'Turistički web ☀️',
+  9: 'Turistički web',
 };
 
 const displaySectionNumbers: Record<SectionId, number> = {
@@ -227,6 +227,14 @@ function App() {
     formState: { errors },
   } = methods;
 
+  const [submitStatus, setSubmitStatus] = useState<
+    'idle' | 'success' | 'error'
+  >('idle');
+  const [submitErrorCode, setSubmitErrorCode] = useState<string | undefined>(
+    undefined
+  );
+  const [submitAttempted, setSubmitAttempted] = useState<boolean>(false);
+
   useWatch<FormData, readonly (keyof FormData)[]>({
     control: methods.control,
     name: sectionFields[currentSection],
@@ -234,26 +242,83 @@ function App() {
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/send-form`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(data),
+      const apiUrl = import.meta.env.VITE_API_URL
+        ? `${import.meta.env.VITE_API_URL}/api/send-form`
+        : '/api/send-form';
+
+      const arrayFields: (keyof FormData)[] = [
+        'ciljevi',
+        'marketingUsluge',
+        'drustveneMreze',
+        'jezici',
+      ];
+
+      // referenced to avoid unused variable lint warnings; keep for future logic
+      void arrayFields;
+
+      const allFields = Object.keys(data) as (keyof FormData)[];
+
+      const allowedSectionsForChoice = (choice: string): SectionId[] => {
+        switch (choice) {
+          case 'Marketing':
+            return [1, 2, 3, 4];
+          case 'Izrada web stranice':
+            return [1, 2, 3, 5, 6, 7, 8, 9];
+          case 'Web + marketing':
+            return [1, 2, 3, 4, 5, 6, 7, 8, 9];
+          default:
+            return [1, 2, 3, 4, 5, 6, 7, 8, 9];
         }
-      );
+      };
+
+      const chosen = data.zaInteresirani ?? '';
+      const allowedSections = allowedSectionsForChoice(chosen);
+
+      const allowedFields = new Set<keyof FormData>();
+      allowedSections.forEach((sec) => {
+        const fields = sectionFields[sec as SectionId] || [];
+        fields.forEach((f) => allowedFields.add(f));
+      });
+
+      // Always include basic contact fields (section 1)
+      sectionFields[1].forEach((f) => allowedFields.add(f));
+
+      const payload: Partial<FormData> = {};
+
+      // Only include fields that are part of the allowed set.
+      // Irrelevant fields are omitted entirely so they are not sent in email.
+      allFields.forEach((field) => {
+        if (allowedFields.has(field)) {
+          payload[field] = data[field];
+        }
+      });
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
 
       if (!response.ok) {
-        throw new Error('Failed to send form');
+        // store numeric status as error code
+        const code = response.status.toString();
+        setSubmitStatus('error');
+        setSubmitErrorCode(code);
+        return;
       }
 
-      console.log('Form submitted successfully');
-      // You can add a success message or redirect here
-    } catch (error) {
-      console.error('Error submitting form:', error);
-      // You can add an error message here
+      setSubmitStatus('success');
+      setSubmitErrorCode(undefined);
+    } catch (err) {
+      setSubmitStatus('error');
+      // If error is an Error, try to extract message, otherwise fallback to 'unknown'
+      if (err instanceof Error) {
+        setSubmitErrorCode(err.message);
+      } else {
+        setSubmitErrorCode('unknown');
+      }
     }
   };
 
@@ -311,6 +376,84 @@ function App() {
     }
   }, [currentSection]);
 
+  if (submitAttempted && submitStatus === 'success') {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'transparent',
+          padding: '24px',
+        }}
+      >
+        <div
+          style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '16px',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.08)',
+            padding: '32px',
+            maxWidth: '600px',
+            width: '100%',
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              whiteSpace: 'pre-wrap',
+              color: 'green',
+              fontWeight: 'bold',
+              fontSize: '18px',
+              lineHeight: 1.6,
+            }}
+          >
+            {`Upitnik poslan! \n Hvala Vam!`}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (submitAttempted && submitStatus === 'error') {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'transparent',
+          padding: '24px',
+        }}
+      >
+        <div
+          style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '16px',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.08)',
+            padding: '32px',
+            maxWidth: '600px',
+            width: '100%',
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              whiteSpace: 'pre-wrap',
+              color: 'red',
+              fontWeight: 'bold',
+              fontSize: '18px',
+              lineHeight: 1.6,
+            }}
+          >
+            {`Slanje nije uspjelo. \n Error: ${submitErrorCode ?? 'unknown'}`}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Note: removed debug watches that displayed form state below the form
 
   const requiredFieldsPerSection: Record<SectionId, (keyof FormData)[]> = {
@@ -345,12 +488,17 @@ function App() {
         <h1 className="section-title">{sectionTitles[currentSection]}</h1>
 
         <FormProvider {...methods}>
-          <form onSubmit={handleSubmit(onSubmit)}>
+          <form
+            onSubmit={(e: FormEvent<HTMLFormElement>) => {
+              e.preventDefault();
+            }}
+          >
             <FormSections
               currentSection={currentSection}
               register={register}
               errors={errors}
             />
+            {/* submission messages are shown outside the form */}
             <div
               style={{
                 display: 'flex',
@@ -390,7 +538,11 @@ function App() {
 
                 return (
                   <button
-                    type="submit"
+                    type="button"
+                    onClick={async () => {
+                      setSubmitAttempted(true);
+                      await handleSubmit(onSubmit)();
+                    }}
                     className={sectionComplete ? 'btn-accent' : 'btn-disabled'}
                   >
                     Submit
