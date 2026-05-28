@@ -46,6 +46,16 @@ export interface FormData {
   nacinDostave: string;
   rezervacijskiSustav: string;
   rezervacijskiDodatci: string;
+  // Additional "Other" text fields for options that support an "Other" input
+  marketingUslugeOther?: string;
+  newsletterFormOther?: string;
+  jeziciOther?: string;
+  sadrzajPripremljenOther?: string;
+  nacinDostaveOther?: string;
+  placanjeOther?: string;
+  kolikoCestoOther?: string;
+  webSaErpomOther?: string;
+  rezervacijskiSustavOther?: string;
 }
 
 type SectionId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
@@ -215,6 +225,16 @@ function App() {
       nacinDostave: '',
       rezervacijskiSustav: '',
       rezervacijskiDodatci: '',
+      // default Other text fields
+      marketingUslugeOther: '',
+      newsletterFormOther: '',
+      jeziciOther: '',
+      sadrzajPripremljenOther: '',
+      nacinDostaveOther: '',
+      placanjeOther: '',
+      kolikoCestoOther: '',
+      webSaErpomOther: '',
+      rezervacijskiSustavOther: '',
     },
   });
 
@@ -293,6 +313,52 @@ function App() {
         }
       });
 
+      // Transform "Other" fields: if the user provided text for an "Other" input
+      // replace the raw 'Other' selection with 'Other: <text>' in the payload.
+      const otherFields = [
+        'marketingUsluge',
+        'newsletterForm',
+        'jezici',
+        'sadrzajPripremljen',
+        'nacinDostave',
+        'placanje',
+        'kolikoCesto',
+        'webSaErpom',
+        'rezervacijskiSustav',
+      ] as const;
+
+      otherFields.forEach((name) => {
+        const otherKey = `${name}Other` as keyof FormData;
+        const payloadKey = name as keyof FormData;
+        const otherVal = (data as unknown as Record<string, unknown>)[
+          otherKey as string
+        ];
+        if (
+          !otherVal ||
+          typeof otherVal !== 'string' ||
+          otherVal.trim().length === 0
+        )
+          return;
+
+        // If payload contains an array (checkbox group), replace 'Other' element
+        const existing = payload[payloadKey];
+        if (Array.isArray(existing)) {
+          const arr = existing as unknown as string[];
+          const idx = arr.indexOf('Other');
+          if (idx !== -1) {
+            arr[idx] = `Other: ${otherVal}`;
+          } else {
+            arr.push(`Other: ${otherVal}`);
+          }
+          payload[payloadKey] = arr as unknown as FormData[keyof FormData];
+          return;
+        }
+
+        // Otherwise (radio / single value), set the field to the formatted Other text
+        payload[payloadKey] =
+          `Other: ${otherVal}` as unknown as FormData[keyof FormData];
+      });
+
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -322,6 +388,37 @@ function App() {
     }
   };
 
+  const smoothScrollToElement = (
+    element: HTMLElement,
+    block: 'start' | 'center' = 'start',
+    duration = 600
+  ) => {
+    const rect = element.getBoundingClientRect();
+    const currentScroll = window.scrollY || window.pageYOffset || 0;
+    let target = currentScroll + rect.top;
+    if (block === 'center') {
+      target =
+        currentScroll + rect.top - window.innerHeight / 2 + rect.height / 2;
+    }
+
+    const start = currentScroll;
+    const change = target - start;
+    const startTime = performance.now();
+
+    const easeInOutQuad = (t: number) =>
+      t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+
+    const animate = (now: number) => {
+      const elapsed = now - startTime;
+      const t = Math.min(1, elapsed / duration);
+      const eased = easeInOutQuad(t);
+      window.scrollTo(0, start + change * eased);
+      if (t < 1) requestAnimationFrame(animate);
+    };
+
+    requestAnimationFrame(animate);
+  };
+
   const scrollToFirstInvalidField = (fields: SectionFieldsType) => {
     const firstInvalidField = fields.find(
       (field) => getFieldState(field).invalid
@@ -338,10 +435,9 @@ function App() {
           '.question-box, div[style*="margin-bottom: 15px"]'
         ) ?? fieldElement;
 
-      questionElement?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-      });
+      if (questionElement) {
+        smoothScrollToElement(questionElement, 'center', 600);
+      }
     });
   };
 
@@ -372,7 +468,7 @@ function App() {
 
   useEffect(() => {
     if (formTopRef.current) {
-      formTopRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      smoothScrollToElement(formTopRef.current, 'start', 600);
     }
   }, [currentSection]);
 
@@ -408,7 +504,7 @@ function App() {
               lineHeight: 1.6,
             }}
           >
-            {`Upitnik poslan! \n Hvala Vam!`}
+            {`Upit poslan! \n Hvala Vam!`}
           </div>
         </div>
       </div>

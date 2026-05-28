@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import { useFormContext } from 'react-hook-form';
 import type { FieldErrors, UseFormRegister } from 'react-hook-form';
 import type { FormData } from './App';
 
@@ -5,6 +7,56 @@ interface FormSectionsProps {
   currentSection: number;
   register: UseFormRegister<FormData>;
   errors: FieldErrors<FormData>;
+}
+
+function OtherField({
+  fieldName,
+  inputType,
+}: {
+  fieldName: keyof FormData;
+  inputType: 'checkbox' | 'radio';
+}) {
+  const { getValues, setValue } = useFormContext<FormData>();
+  const otherKey = `${String(fieldName)}Other` as keyof FormData;
+  const initial = (getValues(otherKey) as unknown as string) ?? '';
+  const [value, setLocalValue] = useState<string>(initial);
+
+  useEffect(() => {
+    // keep form state in sync with local input
+    setValue(otherKey, value);
+    if (value.trim().length > 0) {
+      if (inputType === 'radio') {
+        // ensure radio is set to 'Other'
+        setValue(fieldName, 'Other' as unknown as FormData[keyof FormData]);
+      } else {
+        // checkbox array: ensure 'Other' is present
+        const arr = (getValues(fieldName) as unknown as string[]) ?? [];
+        if (!arr.includes('Other')) {
+          setValue(fieldName, [
+            ...arr,
+            'Other',
+          ] as unknown as FormData[keyof FormData]);
+        }
+      }
+    }
+    // only run when value changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  return (
+    <input
+      type="text"
+      placeholder="Other, please specify"
+      value={value}
+      onChange={(e) => setLocalValue(e.target.value)}
+      style={{
+        width: '100%',
+        padding: '6px',
+        boxSizing: 'border-box',
+        marginTop: '6px',
+      }}
+    />
+  );
 }
 
 export function FormSections({
@@ -524,6 +576,10 @@ export function FormSections({
                   {option}
                 </label>
               ))}
+              <OtherField
+                fieldName={'marketingUsluge'}
+                inputType={'checkbox'}
+              />
             </div>
           </div>
 
@@ -817,6 +873,7 @@ export function FormSections({
                   </label>
                 )
               )}
+              <OtherField fieldName={'newsletterForm'} inputType={'radio'} />
             </div>
           </div>
 
@@ -857,6 +914,7 @@ export function FormSections({
                   </label>
                 )
               )}
+              <OtherField fieldName={'jezici'} inputType={'checkbox'} />
             </div>
           </div>
 
@@ -1021,6 +1079,10 @@ export function FormSections({
                   {option}
                 </label>
               ))}
+              <OtherField
+                fieldName={'sadrzajPripremljen'}
+                inputType={'radio'}
+              />
             </div>
           </div>
 
@@ -1288,6 +1350,7 @@ export function FormSections({
                   </label>
                 )
               )}
+              <OtherField fieldName={'newsletterForm'} inputType={'radio'} />
             </div>
           </div>
 
@@ -1492,6 +1555,10 @@ export function FormSections({
                   {option}
                 </label>
               ))}
+              <OtherField
+                fieldName={'sadrzajPripremljen'}
+                inputType={'radio'}
+              />
             </div>
           </div>
 
@@ -1794,6 +1861,7 @@ export function FormSections({
                   {option}
                 </label>
               ))}
+              <OtherField fieldName={'nacinDostave'} inputType={'radio'} />
             </div>
           </div>
 
@@ -1837,6 +1905,7 @@ export function FormSections({
                   {option}
                 </label>
               ))}
+              <OtherField fieldName={'placanje'} inputType={'radio'} />
             </div>
           </div>
 
@@ -2013,6 +2082,7 @@ export function FormSections({
                   {option}
                 </label>
               ))}
+              <OtherField fieldName={'kolikoCesto'} inputType={'radio'} />
             </div>
           </div>
 
@@ -2089,6 +2159,7 @@ export function FormSections({
                   {option}
                 </label>
               ))}
+              <OtherField fieldName={'webSaErpom'} inputType={'radio'} />
             </div>
           </div>
         </>
@@ -2138,6 +2209,10 @@ export function FormSections({
                   {option}
                 </label>
               ))}
+              <OtherField
+                fieldName={'rezervacijskiSustav'}
+                inputType={'radio'}
+              />
             </div>
           </div>
 
